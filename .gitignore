@@ -1,0 +1,10 @@
+# Homebrew-specific ignores
+*.bottle.*
+.DS_Store
+
+# Test artifacts
+test_output/
+tmp/
+
+# Local development
+*.log
