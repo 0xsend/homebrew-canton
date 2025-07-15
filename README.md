@@ -4,10 +4,9 @@ A Homebrew formula for installing Canton, the blockchain protocol implementation
 
 ## Features
 
-- 🚀 **Snapshot Support**: Installs pre-release snapshot versions from GitHub
+- 📦 **Snapshot Installation**: Installs the specific snapshot version
 - ☕ **Java Integration**: Works with system Java 11+ or Homebrew OpenJDK
 - 📦 **Complete Installation**: Includes binaries, configs, docs, and examples
-- 🔄 **Auto-Updates**: `--HEAD` installs fetch the latest snapshot automatically
 
 ## Installation
 
@@ -15,13 +14,10 @@ A Homebrew formula for installing Canton, the blockchain protocol implementation
 
 ```bash
 # Add this tap to Homebrew
-brew tap your-username/canton homebrew-canton
+brew tap 0xsend/homebrew-canton
 
-# Install Canton (default snapshot version)
+# Install Canton
 brew install canton
-
-# Or install latest snapshot
-brew install canton --HEAD
 ```
 
 ### Direct Formula Installation
@@ -29,9 +25,6 @@ brew install canton --HEAD
 ```bash
 # Install directly from the formula file
 brew install --build-from-source ./Formula/canton.rb
-
-# Or install latest snapshot
-brew install --build-from-source --HEAD ./Formula/canton.rb
 ```
 
 ## Usage
@@ -85,19 +78,11 @@ The formula installs the complete Canton distribution:
 
 ## Version Information
 
-### Default Installation
+The formula installs a specific snapshot version:
 
-The formula defaults to the snapshot version matching the `fetch-canton.ts` script:
-- **DAML Release**: `v3.4.0-snapshot.20250625.0`
-- **Canton Version**: `3.4.0-snapshot.20250617.16217.0.vbdf62919`
-- **SHA256**: `5f1bf64d5d3bf50c4dd379bca44d46069e6ece43377177a6e09b4ff0979f640d`
-
-### HEAD Installation
-
-Using `--HEAD` fetches the latest snapshot release from the GitHub API:
-- Automatically finds the newest pre-release
-- Downloads the `canton-open-source-*.tar.gz` asset
-- No version pinning - always gets the latest
+- **DAML Release**: `v3.4.0-snapshot.20250710.0`
+- **Canton Version**: `3.4.0-snapshot.20250707.16366.0.vf80131e0`
+- **SHA256**: `395d51792fbd1ac38e21754cf21a3cde094a149218707c00e0e0ab0a67aa3a8d`
 
 ## Development
 
@@ -112,43 +97,15 @@ brew install --build-from-source ./Formula/canton.rb
 
 # Test with verbose output
 brew install --build-from-source --verbose ./Formula/canton.rb
-
-# Test HEAD installation
-brew install --build-from-source --HEAD ./Formula/canton.rb
 ```
 
 ### Updating Versions
 
-To update the default version:
+To update the version:
 
 1. Update the `url`, `sha256`, and `version` in the formula
 2. Get the SHA256 with: `curl -L <url> | shasum -a 256`
 3. Test the updated formula
-
-### Formula Structure
-
-```ruby
-class Canton < Formula
-  # Metadata
-  desc "Canton blockchain protocol implementation from Digital Asset"
-  homepage "https://www.canton.network/"
-  license "Apache-2.0"
-  
-  # Version handling
-  if build.head?
-    # HEAD: fetch latest snapshot via GitHub API
-  else
-    # Default: specific snapshot version with checksum
-  end
-  
-  # Dependencies
-  depends_on "openjdk@17" => :recommended
-  
-  # Installation methods
-  def install_release        # Standard version install
-  def install_latest_snapshot # HEAD install with API lookup
-end
-```
 
 ## Troubleshooting
 
