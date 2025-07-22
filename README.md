@@ -145,7 +145,3 @@ brew audit ./Formula/canton.rb
 brew uninstall canton
 brew cleanup
 ```
-
-## License
-
-This Homebrew formula is released under the MIT License. Canton itself is licensed under Apache 2.0.
