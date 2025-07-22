@@ -40,7 +40,7 @@ class Canton < Formula
 
     # Test that Java is available (required for Canton to run)
     java_version = shell_output("java -version 2>&1")
-    assert_match(/version "(1\.[8-9]|[1-9][0-9])\.|version "[1-9][0-9]"/, java_version)
+    assert_match(/version "3.4.0-snapshot.20250707.16366.0.vf80131e0"[1-9][0-9]"/, java_version)
 
     # Test that Canton can show help (basic functionality test)
     output = shell_output("#{bin}/canton --help 2>&1", 0)
