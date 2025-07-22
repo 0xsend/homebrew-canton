@@ -37,9 +37,6 @@ canton --help
 
 # Start Canton with a config
 canton -c /opt/homebrew/etc/canton/config/simple-topology.conf
-
-# Run Canton interactively
-canton --auto-connect-local
 ```
 
 ## Java Requirements
