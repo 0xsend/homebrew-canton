@@ -3,9 +3,9 @@ class Canton < Formula
   homepage "https://www.canton.network/"
   license "Apache-2.0"
 
-  url "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250709.0/canton-open-source-3.4.0-snapshot.20250624.16258.0.v3144db49.tar.gz"
-  sha256 "8fd4026e3e80d8edffb1855dc20c1545bb718e6a20393c1f3b09b747578b7c29"
-  version "3.4.0-snapshot.20250624.16258.0.v3144db49"
+  url "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250710.0/canton-open-source-3.4.0-snapshot.20250707.16366.0.vf80131e0.tar.gz"
+  sha256 "395d51792fbd1ac38e21754cf21a3cde094a149218707c00e0e0ab0a67aa3a8d"
+  version "3.4.0-snapshot.20250707.16366.0.vf80131e0"
 
   # Java 11+ is required (recommend 17 for best compatibility)
   depends_on "openjdk@17" => :recommended
@@ -40,7 +40,7 @@ class Canton < Formula
 
     # Test that Java is available (required for Canton to run)
     java_version = shell_output("java -version 2>&1")
-    assert_match(/version "[1-9][0-9]"/, java_version)
+    assert_match(/version "3.4.0-snapshot.20250707.16366.0.vf80131e0"/, java_version)
 
     # Test that Canton can show help (basic functionality test)
     output = shell_output("#{bin}/canton --help 2>&1", 0)
