@@ -17,10 +17,10 @@ else
   echo "Current version: $CURRENT_VERSION"
 fi
 
-# Get top 5 releases from Digital Asset that contain Canton
+# Get top 5 releases from Digital Asset that contain Canton, prioritizing snapshots
 echo "Fetching top 5 Canton releases from Digital Asset..."
 ALL_RELEASES=$(curl -s "https://api.github.com/repos/digital-asset/daml/releases" | \
-  jq -r '[.[] | select(.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")))] | .[0:5]')
+  jq -r '[.[] | select(.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")))] | sort_by([.prerelease, .published_at]) | reverse | .[0:5]')
 
 if [ "$ALL_RELEASES" = "null" ] || [ "$ALL_RELEASES" = "[]" ]; then
   echo "No Canton releases found"
@@ -84,9 +84,10 @@ while IFS= read -r release; do
   # Cleanup temp file
   rm -f "$TEMP_FILE"
   
-  # Update formula with this version (only for the first/latest version)
-  if [ $PROCESSED_COUNT -eq 0 ]; then
-    echo "Updating Formula/canton.rb with latest version..."
+  # Update formula with the most recent pre-release if this is the first pre-release processed
+  IS_PRERELEASE=$(echo "$release" | jq -r '.prerelease')
+  if [ "$IS_PRERELEASE" = "true" ] && [ $PROCESSED_COUNT -eq 0 ]; then
+    echo "Updating Formula/canton.rb with most recent pre-release: DAML $DAML_TAG (Canton $CANTON_VERSION)..."
     # Use different sed syntax for macOS vs Linux
     if [[ "$OSTYPE" == "darwin"* ]]; then
       # macOS
