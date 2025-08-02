@@ -17,113 +17,121 @@ else
   echo "Current version: $CURRENT_VERSION"
 fi
 
-# Get latest snapshot release from Digital Asset
-echo "Fetching latest Canton snapshot release from Digital Asset..."
-LATEST_RELEASE=$(curl -s "https://api.github.com/repos/digital-asset/daml/releases" | \
-  jq -r '[.[] | select(.prerelease == true) | select(.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")))][0]')
+# Get top 5 releases from Digital Asset that contain Canton
+echo "Fetching top 5 Canton releases from Digital Asset..."
+ALL_RELEASES=$(curl -s "https://api.github.com/repos/digital-asset/daml/releases" | \
+  jq -r '[.[] | select(.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")))] | .[0:5]')
 
-if [ "$LATEST_RELEASE" = "null" ]; then
-  echo "No Canton snapshot release found"
+if [ "$ALL_RELEASES" = "null" ] || [ "$ALL_RELEASES" = "[]" ]; then
+  echo "No Canton releases found"
   exit 0
 fi
 
-LATEST_VERSION=$(echo "$LATEST_RELEASE" | jq -r '.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")) | .name' | sed 's/canton-open-source-\(.*\)\.tar\.gz/\1/')
-LATEST_URL=$(echo "$LATEST_RELEASE" | jq -r '.html_url')
-DOWNLOAD_URL=$(echo "$LATEST_RELEASE" | jq -r '.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")) | .browser_download_url')
+# Get existing tags to avoid duplicates
+echo "Checking existing tags..."
+EXISTING_TAGS=$(git tag -l | sed 's/^canton-//' || echo "")
 
-echo "Latest version: $LATEST_VERSION"
+# Process each of the top 5 releases
+printf "Processing top 5 Canton releases...\n"
+PROCESSED_COUNT=0
+PROCESSED_VERSIONS=""
 
-# Check if we need to update
-if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
-  echo "Already up to date"
-  exit 0
-fi
-
-echo "New version available: $LATEST_VERSION"
-
-# Download and calculate SHA256
-echo "Downloading $DOWNLOAD_URL to calculate SHA256..."
-if command -v wget >/dev/null 2>&1; then
-  wget -q "$DOWNLOAD_URL" -O canton-release.tar.gz
-else
-  curl -s -L "$DOWNLOAD_URL" -o canton-release.tar.gz
-fi
-
-# Calculate SHA256 (different command on macOS vs Linux)
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  SHA256=$(shasum -a 256 canton-release.tar.gz | cut -d' ' -f1)
-else
-  SHA256=$(sha256sum canton-release.tar.gz | cut -d' ' -f1)
-fi
-echo "SHA256: $SHA256"
-
-# Cleanup
-rm -f canton-release.tar.gz
-
-# Update formula
-echo "Updating Formula/canton.rb..."
-# Use different sed syntax for macOS vs Linux
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  # macOS
-  sed -i '' "s|url \"https://github\.com/digital-asset/daml/releases/download/[^\"]*\"|url \"$DOWNLOAD_URL\"|" Formula/canton.rb
-  sed -i '' "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"$SHA256\"|" Formula/canton.rb
-  sed -i '' "s|version \"[^\"]*\"|version \"$LATEST_VERSION\"|" Formula/canton.rb
-else
-  # Linux
-  sed -i "s|url \"https://github\.com/digital-asset/daml/releases/download/[^\"]*\"|url \"$DOWNLOAD_URL\"|" Formula/canton.rb
-  sed -i "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"$SHA256\"|" Formula/canton.rb
-  sed -i "s|version \"[^\"]*\"|version \"$LATEST_VERSION\"|" Formula/canton.rb
-fi
-
-# Only commit and create release if running in CI (GITHUB_TOKEN is set)
-if [ -n "$GITHUB_TOKEN" ]; then
-  echo "Running in CI, checking for changes and creating release..."
-
-  # Configure git
-  git config --local user.email "action@github.com"
-  git config --local user.name "GitHub Action"
-
-  # Add formula changes
-  git add Formula/canton.rb
-
-  # Check if there are any changes to commit
-  if git diff --cached --quiet; then
-    echo "No changes detected in Formula/canton.rb, skipping commit"
+# Use process substitution to avoid subshell issues
+while IFS= read -r release; do
+  VERSION=$(echo "$release" | jq -r '.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")) | .name' | sed 's/canton-open-source-\(.*\)\.tar\.gz/\1/')
+  RELEASE_URL=$(echo "$release" | jq -r '.html_url')
+  DOWNLOAD_URL=$(echo "$release" | jq -r '.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")) | .browser_download_url')
+  
+  printf "\n=== Processing Canton version: %s ===\n" "$VERSION"
+  
+  # Check if this version already exists as a tag or was already processed
+  if echo "$EXISTING_TAGS" | grep -q "^$VERSION$"; then
+    echo "Tag canton-$VERSION already exists, skipping..."
+    continue
+  fi
+  
+  # Check if we already processed this version in this run
+  if echo "$PROCESSED_VERSIONS" | grep -q "$VERSION"; then
+    echo "Version $VERSION already processed in this run, skipping..."
+    continue
+  fi
+  
+  PROCESSED_VERSIONS="$PROCESSED_VERSIONS $VERSION"
+  
+  echo "New version found: $VERSION"
+  
+  # Download and calculate SHA256
+  echo "Downloading $DOWNLOAD_URL to calculate SHA256..."
+  TEMP_FILE="canton-release-$VERSION.tar.gz"
+  if command -v wget >/dev/null 2>&1; then
+    wget -q "$DOWNLOAD_URL" -O "$TEMP_FILE"
   else
-    echo "Changes detected, committing and pushing..."
-    # Commit formula changes
-    if ! git commit -m "feat: update Canton to $LATEST_VERSION
-
-Release URL: $LATEST_URL
-
-🤖 Generated with GitHub Actions"; then
-      echo "Failed to commit changes"
-      exit 1
+    curl -s -L "$DOWNLOAD_URL" -o "$TEMP_FILE"
+  fi
+  
+  # Calculate SHA256 (different command on macOS vs Linux)
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    SHA256=$(shasum -a 256 "$TEMP_FILE" | cut -d' ' -f1)
+  else
+    SHA256=$(sha256sum "$TEMP_FILE" | cut -d' ' -f1)
+  fi
+  echo "SHA256: $SHA256"
+  
+  # Cleanup temp file
+  rm -f "$TEMP_FILE"
+  
+  # Update formula with this version (only for the first/latest version)
+  if [ $PROCESSED_COUNT -eq 0 ]; then
+    echo "Updating Formula/canton.rb with latest version..."
+    # Use different sed syntax for macOS vs Linux
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      # macOS
+      sed -i '' "s|url \"https://github\.com/digital-asset/daml/releases/download/[^\"]*\"|url \"$DOWNLOAD_URL\"|" Formula/canton.rb
+      sed -i '' "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"$SHA256\"|" Formula/canton.rb
+      sed -i '' "s|version \"[^\"]*\"|version \"$VERSION\"|" Formula/canton.rb
+    else
+      # Linux
+      sed -i "s|url \"https://github\.com/digital-asset/daml/releases/download/[^\"]*\"|url \"$DOWNLOAD_URL\"|" Formula/canton.rb
+      sed -i "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"$SHA256\"|" Formula/canton.rb
+      sed -i "s|version \"[^\"]*\"|version \"$VERSION\"|" Formula/canton.rb
     fi
+  fi
 
-    if ! git push; then
-      echo "Failed to push changes"
-      exit 1
+  # Only commit and create release if running in CI (GITHUB_TOKEN is set)
+  if [ -n "$GITHUB_TOKEN" ]; then
+    echo "Running in CI, creating release for $VERSION..."
+    
+    # Configure git (only once)
+    if [ $PROCESSED_COUNT -eq 0 ]; then
+      git config --local user.email "action@github.com"
+      git config --local user.name "GitHub Action"
     fi
-
-    # Create GitHub release and tag
-    if ! git tag "canton-$LATEST_VERSION"; then
-      echo "Failed to create tag"
-      exit 1
+    
+    # Create GitHub release and tag for this version
+    if ! git tag "canton-$VERSION"; then
+      echo "Failed to create tag for $VERSION"
+      continue
     fi
-
-    if ! git push origin "canton-$LATEST_VERSION"; then
-      echo "Failed to push tag"
-      exit 1
+    
+    if ! git push origin "canton-$VERSION"; then
+      echo "Failed to push tag for $VERSION"
+      continue
     fi
+    
+    # Determine if this should be marked as latest (first processed version)
+    LATEST_FLAG=""
+    if [ $PROCESSED_COUNT -eq 0 ]; then
+      LATEST_FLAG="--latest"
+    fi
+    
+    if ! gh release create "canton-$VERSION" \
+      --title "Canton $VERSION" \
+      --notes "Homebrew formula for Canton version $VERSION.
 
-    if ! gh release create "canton-$LATEST_VERSION" \
-      --title "Canton $LATEST_VERSION" \
-      --notes "Homebrew formula updated to Canton version $LATEST_VERSION.
-
-This release tracks the Canton snapshot release from Digital Asset:
-- Original Release: $LATEST_URL
-- Canton Version: $LATEST_VERSION
+This release tracks the Canton release from Digital Asset:
+- Original Release: $RELEASE_URL
+- Canton Version: $VERSION
+- SHA256: $SHA256
 
 Install with:
 \`\`\`bash
@@ -137,18 +145,52 @@ brew install 0xsend/homebrew-canton/canton
 \`\`\`
 
 🤖 Auto-generated by GitHub Actions" \
-      --latest; then
-      echo "Failed to create GitHub release"
+      $LATEST_FLAG; then
+      echo "Failed to create GitHub release for $VERSION"
+      continue
+    fi
+    
+    echo "Successfully created release for Canton $VERSION"
+  else
+    echo "Running locally, found version $VERSION"
+    echo "- URL: $DOWNLOAD_URL"
+    echo "- SHA256: $SHA256"
+  fi
+  
+  PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
+done < <(echo "$ALL_RELEASES" | jq -c '.[]')
+
+# Commit formula changes if running in CI and we processed any versions
+if [ -n "$GITHUB_TOKEN" ] && [ "$PROCESSED_COUNT" -gt 0 ]; then
+  printf "\nCommitting formula changes...\n"
+  git add Formula/canton.rb
+  
+  # Check if there are any changes to commit
+  if ! git diff --cached --quiet; then
+    if ! git commit -m "feat: update Canton formula to latest versions
+
+Processed $PROCESSED_COUNT Canton releases
+
+🤖 Generated with GitHub Actions"; then
+      echo "Failed to commit formula changes"
       exit 1
     fi
-
-    echo "Successfully created release for Canton $LATEST_VERSION"
+    
+    if ! git push; then
+      echo "Failed to push formula changes"
+      exit 1
+    fi
+    
+    echo "Successfully committed formula changes"
+  else
+    echo "No formula changes to commit"
   fi
-else
-  echo "Running locally, formula updated but not committing"
-  echo "Updated formula to Canton $LATEST_VERSION"
-  echo "- URL: $DOWNLOAD_URL"
-  echo "- SHA256: $SHA256"
 fi
 
-echo "=== Update complete ==="
+if [ "$PROCESSED_COUNT" -eq 0 ]; then
+  printf "\nNo new Canton versions to process\n"
+else
+  printf "\nProcessed %d new Canton versions\n" "$PROCESSED_COUNT"
+fi
+
+echo "=== Canton release scan complete ==="

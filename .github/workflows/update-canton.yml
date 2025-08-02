@@ -3,7 +3,7 @@ name: Check and Release Canton Updates
 on:
   schedule:
     # Run every 12 hours
-    - cron: '0 */12 * * *'
+    - cron: "0 */12 * * *"
   workflow_dispatch: # Allow manual triggering
 
 jobs:
@@ -11,14 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Run Canton update script
-      run: ./update.sh
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0 # Fetch full history including tags
+          fetch-tags: true
+
+      - name: Run Canton update script
+        run: ./update.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
