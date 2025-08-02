@@ -38,31 +38,35 @@ PROCESSED_VERSIONS=""
 
 # Use process substitution to avoid subshell issues
 while IFS= read -r release; do
-  VERSION=$(echo "$release" | jq -r '.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")) | .name' | sed 's/canton-open-source-\(.*\)\.tar\.gz/\1/')
+  DAML_TAG=$(echo "$release" | jq -r '.tag_name')
+  CANTON_VERSION=$(echo "$release" | jq -r '.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")) | .name' | sed 's/canton-open-source-\(.*\)\.tar\.gz/\1/')
   RELEASE_URL=$(echo "$release" | jq -r '.html_url')
   DOWNLOAD_URL=$(echo "$release" | jq -r '.assets[] | select(.name | contains("canton-open-source") and endswith(".tar.gz")) | .browser_download_url')
   
-  printf "\n=== Processing Canton version: %s ===\n" "$VERSION"
+  # Create a unique tag based on both DAML tag and Canton version
+  TAG_NAME="canton-${DAML_TAG}-${CANTON_VERSION}"
   
-  # Check if this version already exists as a tag or was already processed
-  if echo "$EXISTING_TAGS" | grep -q "^$VERSION$"; then
-    echo "Tag canton-$VERSION already exists, skipping..."
+  printf "\n=== Processing DAML %s (Canton %s) ===\n" "$DAML_TAG" "$CANTON_VERSION"
+  
+  # Check if this specific combination already exists as a tag
+  if echo "$EXISTING_TAGS" | grep -q "^${DAML_TAG}-${CANTON_VERSION}$"; then
+    echo "Tag $TAG_NAME already exists, skipping..."
     continue
   fi
   
-  # Check if we already processed this version in this run
-  if echo "$PROCESSED_VERSIONS" | grep -q "$VERSION"; then
-    echo "Version $VERSION already processed in this run, skipping..."
+  # Check if we already processed this combination in this run
+  if echo "$PROCESSED_VERSIONS" | grep -q "${DAML_TAG}-${CANTON_VERSION}"; then
+    echo "Version ${DAML_TAG}-${CANTON_VERSION} already processed in this run, skipping..."
     continue
   fi
   
-  PROCESSED_VERSIONS="$PROCESSED_VERSIONS $VERSION"
+  PROCESSED_VERSIONS="$PROCESSED_VERSIONS ${DAML_TAG}-${CANTON_VERSION}"
   
-  echo "New version found: $VERSION"
+  echo "New release found: DAML $DAML_TAG with Canton $CANTON_VERSION"
   
   # Download and calculate SHA256
   echo "Downloading $DOWNLOAD_URL to calculate SHA256..."
-  TEMP_FILE="canton-release-$VERSION.tar.gz"
+  TEMP_FILE="canton-release-${DAML_TAG}-${CANTON_VERSION}.tar.gz"
   if command -v wget >/dev/null 2>&1; then
     wget -q "$DOWNLOAD_URL" -O "$TEMP_FILE"
   else
@@ -88,18 +92,18 @@ while IFS= read -r release; do
       # macOS
       sed -i '' "s|url \"https://github\.com/digital-asset/daml/releases/download/[^\"]*\"|url \"$DOWNLOAD_URL\"|" Formula/canton.rb
       sed -i '' "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"$SHA256\"|" Formula/canton.rb
-      sed -i '' "s|version \"[^\"]*\"|version \"$VERSION\"|" Formula/canton.rb
+      sed -i '' "s|version \"[^\"]*\"|version \"$CANTON_VERSION\"|" Formula/canton.rb
     else
       # Linux
       sed -i "s|url \"https://github\.com/digital-asset/daml/releases/download/[^\"]*\"|url \"$DOWNLOAD_URL\"|" Formula/canton.rb
       sed -i "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"$SHA256\"|" Formula/canton.rb
-      sed -i "s|version \"[^\"]*\"|version \"$VERSION\"|" Formula/canton.rb
+      sed -i "s|version \"[^\"]*\"|version \"$CANTON_VERSION\"|" Formula/canton.rb
     fi
   fi
 
   # Only commit and create release if running in CI (GITHUB_TOKEN is set)
   if [ -n "$GITHUB_TOKEN" ]; then
-    echo "Running in CI, creating release for $VERSION..."
+    echo "Running in CI, creating release for $TAG_NAME..."
     
     # Configure git (only once)
     if [ $PROCESSED_COUNT -eq 0 ]; then
@@ -108,13 +112,13 @@ while IFS= read -r release; do
     fi
     
     # Create GitHub release and tag for this version
-    if ! git tag "canton-$VERSION"; then
-      echo "Failed to create tag for $VERSION"
+    if ! git tag "$TAG_NAME"; then
+      echo "Failed to create tag for $TAG_NAME"
       continue
     fi
     
-    if ! git push origin "canton-$VERSION"; then
-      echo "Failed to push tag for $VERSION"
+    if ! git push origin "$TAG_NAME"; then
+      echo "Failed to push tag for $TAG_NAME"
       continue
     fi
     
@@ -124,13 +128,14 @@ while IFS= read -r release; do
       LATEST_FLAG="--latest"
     fi
     
-    if ! gh release create "canton-$VERSION" \
-      --title "Canton $VERSION" \
-      --notes "Homebrew formula for Canton version $VERSION.
+    if ! gh release create "$TAG_NAME" \
+      --title "Canton $CANTON_VERSION (DAML $DAML_TAG)" \
+      --notes "Homebrew formula for Canton version $CANTON_VERSION from DAML release $DAML_TAG.
 
 This release tracks the Canton release from Digital Asset:
+- DAML Release: $DAML_TAG
 - Original Release: $RELEASE_URL
-- Canton Version: $VERSION
+- Canton Version: $CANTON_VERSION
 - SHA256: $SHA256
 
 Install with:
@@ -150,9 +155,9 @@ brew install 0xsend/homebrew-canton/canton
       continue
     fi
     
-    echo "Successfully created release for Canton $VERSION"
+    echo "Successfully created release for $TAG_NAME"
   else
-    echo "Running locally, found version $VERSION"
+    echo "Running locally, found DAML $DAML_TAG with Canton $CANTON_VERSION"
     echo "- URL: $DOWNLOAD_URL"
     echo "- SHA256: $SHA256"
   fi
