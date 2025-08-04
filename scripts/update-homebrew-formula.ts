@@ -88,7 +88,7 @@ async function updateFormula(
 	release: CantonRelease,
 	sha256: string,
 ): Promise<void> {
-	console.log(`Updating Formula/canton.rb with ${release.cantonVersion}...`);
+	console.log(`Updating Formula/canton.rb with ${release.damlTag}...`);
 
 	try {
 		const formulaContent = await fs.readFile(FORMULA_PATH, "utf-8");
@@ -108,7 +108,7 @@ async function updateFormula(
 		// Update version
 		const versionUpdated = sha256Updated.replace(
 			/version "[^"]*"/,
-			`version "${release.cantonVersion}"`,
+			`version "${release.damlTag}"`,
 		);
 
 		await fs.writeFile(FORMULA_PATH, versionUpdated);
@@ -292,7 +292,7 @@ async function updateHomebrewFormula(): Promise<void> {
 	} else {
 		console.log(`\nProcessed ${processedCount} new Canton versions`);
 		if (mostRecentPrerelease) {
-			console.log(`Updated formula to: ${mostRecentPrerelease.cantonVersion}`);
+			console.log(`Updated formula to: ${mostRecentPrerelease.damlTag}`);
 		}
 	}
 
