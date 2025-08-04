@@ -81,6 +81,28 @@ The formula installs a specific snapshot version:
 - **Canton Version**: `3.4.0-snapshot.20250707.16366.0.vf80131e0`
 - **SHA256**: `395d51792fbd1ac38e21754cf21a3cde094a149218707c00e0e0ab0a67aa3a8d`
 
+## Automated Canton Tracking
+
+This repository automatically tracks Canton releases from Digital Asset:
+
+- **Automated Updates**: GitHub Actions runs every 12 hours to check for new Canton releases
+- **Version Management**: Creates git tags and GitHub releases for each Canton version
+- **SHA256 Verification**: Automatically calculates and verifies package hashes
+- **Formula Updates**: Keeps the Homebrew formula current with latest releases
+
+### Manual Updates
+
+```bash
+# Run manual update
+./update.sh
+
+# Check for new versions
+bun run scripts/canton-versions.ts current
+
+# List all available versions
+bun run scripts/canton-versions.ts all
+```
+
 ## Development
 
 ### Testing the Formula
@@ -96,13 +118,20 @@ brew install --build-from-source ./Formula/canton.rb
 brew install --build-from-source --verbose ./Formula/canton.rb
 ```
 
-### Updating Versions
+### Version Management
 
-To update the version:
+The repository uses TypeScript scripts with Bun for version management:
 
-1. Update the `url`, `sha256`, and `version` in the formula
-2. Get the SHA256 with: `curl -L <url> | shasum -a 256`
-3. Test the updated formula
+```bash
+# Check current Canton version
+bun run scripts/canton-versions.ts current
+
+# Get all versions with details
+bun run scripts/canton-versions.ts all
+
+# Calculate SHA256 for a specific URL
+bun run scripts/canton-versions.ts sha256 <download-url>
+```
 
 ## Troubleshooting
 

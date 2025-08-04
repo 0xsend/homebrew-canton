@@ -1,0 +1,307 @@
+#!/usr/bin/env bun
+/**
+ * Update Homebrew Formula Script
+ *
+ * Simplified script to update the homebrew-canton formula with the latest Canton versions.
+ * Replaces the complex 203-line bash script with clean TypeScript logic.
+ *
+ * Usage: bun run update:homebrew
+ */
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import {
+	type CantonRelease,
+	calculateSha256,
+	getAllCantonVersions,
+} from "./canton-versions";
+
+const HOMEBREW_CANTON_PATH = ".";
+const FORMULA_PATH = path.join(HOMEBREW_CANTON_PATH, "Formula/canton.rb");
+
+interface ExistingTag {
+	name: string;
+	damlTag: string;
+	cantonVersion: string;
+}
+
+/**
+ * Get existing tags from homebrew-canton repository
+ */
+async function getExistingTags(): Promise<ExistingTag[]> {
+	try {
+		const { spawn } = require("node:child_process");
+		const process = spawn("git", ["tag", "-l"], {
+			cwd: HOMEBREW_CANTON_PATH,
+			stdio: ["pipe", "pipe", "pipe"],
+		});
+
+		let output = "";
+		process.stdout.on("data", (data: Buffer) => {
+			output += data.toString();
+		});
+
+		await new Promise((resolve, reject) => {
+			process.on("close", (code: number) => {
+				if (code === 0) resolve(code);
+				else reject(new Error(`git tag command failed with code ${code}`));
+			});
+		});
+
+		return output
+			.split("\n")
+			.filter((line) => line.startsWith("canton-"))
+			.map((tag) => {
+				// Parse canton-{damlTag}-{cantonVersion} format (new format)
+				const newFormatMatch = tag.match(/^canton-(.+)-(.+)$/);
+				if (newFormatMatch?.[1]?.startsWith("v")) {
+					return {
+						name: tag,
+						damlTag: newFormatMatch[1],
+						cantonVersion: newFormatMatch[2],
+					};
+				}
+				
+				// Parse canton-{cantonVersion} format (old format)
+				// We'll treat these as having no associated DAML tag
+				const oldFormatMatch = tag.match(/^canton-(.+)$/);
+				if (oldFormatMatch && !oldFormatMatch[1].includes("-")) {
+					return {
+						name: tag,
+						damlTag: "", // No DAML tag for old format
+						cantonVersion: oldFormatMatch[1],
+					};
+				}
+				
+				return null;
+			})
+			.filter(Boolean) as ExistingTag[];
+	} catch (error) {
+		console.warn("Could not fetch existing tags, assuming none exist:", error);
+		return [];
+	}
+}
+
+/**
+ * Update the canton.rb formula with new version information
+ */
+async function updateFormula(
+	release: CantonRelease,
+	sha256: string,
+): Promise<void> {
+	console.log(`Updating Formula/canton.rb with ${release.cantonVersion}...`);
+
+	try {
+		const formulaContent = await fs.readFile(FORMULA_PATH, "utf-8");
+
+		// Update URL
+		const urlUpdated = formulaContent.replace(
+			/url "https:\/\/github\.com\/digital-asset\/daml\/releases\/download\/[^"]*"/,
+			`url "${release.downloadUrl}"`,
+		);
+
+		// Update SHA256
+		const sha256Updated = urlUpdated.replace(
+			/sha256 "[a-f0-9]{64}"/,
+			`sha256 "${sha256}"`,
+		);
+
+		// Update version
+		const versionUpdated = sha256Updated.replace(
+			/version "[^"]*"/,
+			`version "${release.cantonVersion}"`,
+		);
+
+		await fs.writeFile(FORMULA_PATH, versionUpdated);
+		console.log("Formula updated successfully");
+	} catch (error) {
+		throw new Error(`Failed to update formula: ${error}`);
+	}
+}
+
+/**
+ * Create git tag and GitHub release for a Canton version
+ */
+async function createReleaseAndTag(
+	release: CantonRelease,
+	sha256: string,
+): Promise<boolean> {
+	const tagName = `canton-${release.damlTag}-${release.cantonVersion}`;
+
+	console.log(`Creating release and tag: ${tagName}`);
+
+	if (!process.env.GITHUB_TOKEN) {
+		console.log("No GITHUB_TOKEN found, skipping git operations");
+		console.log(`Would create tag: ${tagName}`);
+		console.log(`- DAML Tag: ${release.damlTag}`);
+		console.log(`- Canton Version: ${release.cantonVersion}`);
+		console.log(`- SHA256: ${sha256}`);
+		console.log(`- Download URL: ${release.downloadUrl}`);
+		return false;
+	}
+
+	try {
+		const { $ } = await import("bun");
+
+		// Check if tag already exists before creating
+		try {
+			await $`cd ${HOMEBREW_CANTON_PATH} && git rev-parse --verify refs/tags/${tagName}`.quiet();
+			console.log(`Tag ${tagName} already exists, skipping creation`);
+			return true; // Consider it successful since tag exists
+		} catch {
+			// Tag doesn't exist, continue with creation
+		}
+
+		// Create and push tag
+		await $`cd ${HOMEBREW_CANTON_PATH} && git tag ${tagName}`;
+		await $`cd ${HOMEBREW_CANTON_PATH} && git push origin ${tagName}`;
+
+		// Create GitHub release
+		const releaseNotes = `Homebrew formula for Canton version ${release.cantonVersion} from DAML release ${release.damlTag}.
+
+This release tracks the Canton release from Digital Asset:
+- DAML Release: ${release.damlTag}
+- Original Release: ${release.htmlUrl} 
+- Canton Version: ${release.cantonVersion}
+- SHA256: ${sha256}
+
+Install with:
+\`\`\`bash
+brew tap 0xsend/homebrew-canton
+brew install canton
+\`\`\`
+
+Or install directly:
+\`\`\`bash
+brew install 0xsend/homebrew-canton/canton
+\`\`\`
+
+🤖 Auto-generated by GitHub Actions`;
+
+		await $`cd ${HOMEBREW_CANTON_PATH} && gh release create ${tagName} --title "Canton ${release.cantonVersion} (DAML ${release.damlTag})" --notes ${releaseNotes}`;
+
+		console.log(`Successfully created release: ${tagName}`);
+		return true;
+	} catch (error) {
+		console.error(`Failed to create release for ${tagName}:`, error);
+		return false;
+	}
+}
+
+/**
+ * Commit formula changes to git
+ */
+async function commitFormulaChanges(processedCount: number): Promise<void> {
+	if (!process.env.GITHUB_TOKEN) {
+		console.log("No GITHUB_TOKEN found, skipping git commit");
+		return;
+	}
+
+	try {
+		const { $ } = await import("bun");
+
+		// Configure git
+		await $`cd ${HOMEBREW_CANTON_PATH} && git config --local user.email "action@github.com"`;
+		await $`cd ${HOMEBREW_CANTON_PATH} && git config --local user.name "GitHub Action"`;
+
+		// Check if there are changes
+		const gitDiff =
+			await $`cd ${HOMEBREW_CANTON_PATH} && git diff --cached --quiet`.catch(
+				() => false,
+			);
+
+		if (gitDiff === false) {
+			// There are changes to commit
+			await $`cd ${HOMEBREW_CANTON_PATH} && git add Formula/canton.rb`;
+			await $`cd ${HOMEBREW_CANTON_PATH} && git commit -m "feat: update Canton formula to latest versions
+
+Processed ${processedCount} Canton releases
+
+🤖 Generated with GitHub Actions"`;
+			await $`cd ${HOMEBREW_CANTON_PATH} && git push`;
+			console.log("Successfully committed formula changes");
+		} else {
+			console.log("No formula changes to commit");
+		}
+	} catch (error) {
+		console.error("Failed to commit formula changes:", error);
+	}
+}
+
+/**
+ * Main update function
+ */
+async function updateHomebrewFormula(): Promise<void> {
+	console.log("=== Canton Homebrew Formula Update Script ===");
+
+	// Get all Canton versions and existing tags
+	const [allReleases, existingTags] = await Promise.all([
+		getAllCantonVersions(),
+		getExistingTags(),
+	]);
+
+	// Get top 5 releases to process
+	const topReleases = allReleases.slice(0, 5);
+	console.log(`Processing top ${topReleases.length} Canton releases...`);
+
+	let processedCount = 0;
+	let mostRecentPrerelease: CantonRelease | null = null;
+
+	for (const release of topReleases) {
+		// Check if this version already exists (either format)
+		const existingTag = existingTags.find(
+			(tag) =>
+				(tag.damlTag === release.damlTag && tag.cantonVersion === release.cantonVersion) ||
+				tag.cantonVersion === release.cantonVersion, // Check old format too
+		);
+
+		if (existingTag) {
+			console.log(`Tag ${existingTag.name} already exists, skipping...`);
+			continue;
+		}
+
+		console.log(
+			`\n=== Processing DAML ${release.damlTag} (Canton ${release.cantonVersion}) ===`,
+		);
+		console.log(
+			`New release found: DAML ${release.damlTag} with Canton ${release.cantonVersion}`,
+		);
+
+		// Calculate SHA256
+		const sha256 = await calculateSha256(release.downloadUrl);
+
+		// Update formula if this is the first prerelease we're processing
+		if (release.isPrerelease && processedCount === 0) {
+			mostRecentPrerelease = release;
+			await updateFormula(release, sha256);
+		}
+
+		// Create release and tag
+		const success = await createReleaseAndTag(release, sha256);
+		if (success) {
+			processedCount++;
+		}
+	}
+
+	// Commit formula changes if any were made
+	if (processedCount > 0) {
+		await commitFormulaChanges(processedCount);
+	}
+
+	if (processedCount === 0) {
+		console.log("\nNo new Canton versions to process");
+	} else {
+		console.log(`\nProcessed ${processedCount} new Canton versions`);
+		if (mostRecentPrerelease) {
+			console.log(`Updated formula to: ${mostRecentPrerelease.cantonVersion}`);
+		}
+	}
+
+	console.log("=== Canton release scan complete ===");
+}
+
+// Run if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+	updateHomebrewFormula().catch(console.error);
+}
+
+export { updateHomebrewFormula };

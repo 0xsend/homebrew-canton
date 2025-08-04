@@ -20,7 +20,28 @@ jobs:
           fetch-depth: 0 # Fetch full history including tags
           fetch-tags: true
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      - name: Configure git for automated commits
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
       - name: Run Canton update script
+        run: bun run scripts/update-homebrew-formula.ts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run update script (fallback)
+        if: failure()
         run: ./update.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
