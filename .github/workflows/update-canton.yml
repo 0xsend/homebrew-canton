@@ -76,7 +76,7 @@ jobs:
           echo "🔐 Verifying SHA256 hashes in manifest..."
           
           # Create a verification script
-          cat > verify-sha256.ts << 'EOF'
+          cat > verify-sha256.ts << 'VERIFY_SCRIPT_END'
           import { readFile } from "node:fs/promises";
           import { createHash } from "node:crypto";
           
@@ -117,7 +117,7 @@ jobs:
           if (errors > 0) {
             process.exit(1);
           }
-EOF
+VERIFY_SCRIPT_END
           
           bun run verify-sha256.ts
 
@@ -156,7 +156,7 @@ EOF
           echo "🏗️ Creating versioned formulas for new releases..."
           
           # Create a script to generate formulas for new versions
-          cat > create-new-formulas.ts << 'EOF'
+          cat > create-new-formulas.ts << 'CREATE_FORMULAS_END'
           import { readFile, readdir } from "node:fs/promises";
           import { spawn } from "node:child_process";
           import { promisify } from "node:util";
@@ -196,7 +196,7 @@ EOF
           }
           
           console.log(`Created ${created} new versioned formulas`);
-EOF
+CREATE_FORMULAS_END
           
           bun run create-new-formulas.ts
 
