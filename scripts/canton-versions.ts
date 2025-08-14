@@ -122,6 +122,47 @@ export async function getCantonVersion(
 }
 
 /**
+ * Gets a specific Canton release by DAML tag
+ */
+export async function getCantonReleaseByDamlTag(
+	damlTag: string,
+): Promise<CantonRelease | null> {
+	const releases = await getAllCantonVersions();
+	return releases.find((r) => r.damlTag === damlTag) || null;
+}
+
+/**
+ * Gets Canton release info from local manifest (if available)
+ */
+export async function getCantonReleaseFromManifest(
+	damlTag: string,
+): Promise<CantonRelease | null> {
+	try {
+		const manifestPath = new URL("../canton-versions.json", import.meta.url).pathname;
+		const manifestData = await Bun.file(manifestPath).text();
+		const manifest = JSON.parse(manifestData);
+		
+		const versionInfo = manifest.versions[damlTag];
+		if (versionInfo) {
+			return {
+				cantonVersion: versionInfo.cantonVersion,
+				damlTag: damlTag,
+				downloadUrl: versionInfo.downloadUrl,
+				sha256: versionInfo.sha256,
+				isPrerelease: versionInfo.isPrerelease,
+				publishedAt: versionInfo.publishedAt,
+				htmlUrl: `https://github.com/digital-asset/daml/releases/tag/${damlTag}`
+			};
+		}
+	} catch (error) {
+		// Manifest not found or invalid
+	}
+	
+	// Fall back to fetching from API
+	return getCantonReleaseByDamlTag(damlTag);
+}
+
+/**
  * Calculates SHA256 hash for a Canton release by downloading it
  */
 export async function calculateSha256(downloadUrl: string): Promise<string> {

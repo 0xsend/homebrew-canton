@@ -1,0 +1,163 @@
+name: Test Manifest Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions_to_process:
+        description: 'Number of versions to process'
+        required: false
+        default: '5'
+        type: choice
+        options:
+          - '3'
+          - '5'
+          - '10'
+          - '20'
+      dry_run:
+        description: 'Dry run (no commits)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  test-manifest:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Test manifest generation
+        run: |
+          echo "🧪 Testing manifest generation with ${{ inputs.versions_to_process }} versions"
+          
+          # Generate manifest
+          bun run scripts/generate-version-manifest.ts ${{ inputs.versions_to_process }}
+          
+          # Show manifest statistics
+          echo ""
+          echo "📊 Manifest Statistics:"
+          bun -e '
+            const manifest = require("./canton-versions.json");
+            const total = Object.keys(manifest.versions).length;
+            const prerelease = Object.values(manifest.versions).filter(v => v.is_prerelease).length;
+            const stable = total - prerelease;
+            
+            console.log(`Total versions: ${total}`);
+            console.log(`Pre-releases: ${prerelease}`);
+            console.log(`Stable releases: ${stable}`);
+            
+            console.log("\nLatest 3 versions:");
+            Object.entries(manifest.versions).slice(0, 3).forEach(([tag, info]) => {
+              const type = info.is_prerelease ? "pre-release" : "stable";
+              console.log(`  ${tag} - ${info.canton_version} (${type})`);
+              console.log(`    SHA256: ${info.sha256.substring(0, 12)}...`);
+            });
+          '
+          
+      - name: Test SHA256 verification
+        run: |
+          echo ""
+          echo "🔐 Testing SHA256 verification..."
+          
+          # Verify the first version's SHA256
+          bun -e '
+            import { createHash } from "crypto";
+            
+            const manifest = JSON.parse(await Bun.file("canton-versions.json").text());
+            const [tag, info] = Object.entries(manifest.versions)[0];
+            
+            console.log(`Verifying ${tag}...`);
+            console.log(`  URL: ${info.download_url}`);
+            console.log(`  Expected SHA256: ${info.sha256}`);
+            
+            try {
+              const response = await fetch(info.download_url);
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+              }
+              
+              const buffer = await response.arrayBuffer();
+              const hash = createHash("sha256");
+              hash.update(new Uint8Array(buffer));
+              const calculated = hash.digest("hex");
+              
+              if (calculated === info.sha256) {
+                console.log(`  ✅ SHA256 verified successfully`);
+              } else {
+                console.error(`  ❌ SHA256 mismatch!`);
+                console.error(`  Got: ${calculated}`);
+                process.exit(1);
+              }
+            } catch (error) {
+              console.error(`  ❌ Failed to verify: ${error.message}`);
+              process.exit(1);
+            }
+          '
+          
+      - name: Test versioned formula creation
+        run: |
+          echo ""
+          echo "🏗️ Testing versioned formula creation..."
+          
+          # Get the latest version from manifest
+          TAG=$(bun -e '
+            const manifest = require("./canton-versions.json");
+            const tag = Object.keys(manifest.versions)[0];
+            console.log(tag);
+          ')
+          
+          echo "Creating formula for $TAG..."
+          ruby scripts/create-versioned-formula.rb "$TAG"
+          
+          # Check if formula was created
+          VERSION_TAG=${TAG#v}
+          if [ -f "Formula/canton@${VERSION_TAG}.rb" ]; then
+            echo "✅ Formula created successfully: canton@${VERSION_TAG}.rb"
+            
+            # Show formula info
+            echo ""
+            echo "Formula details:"
+            grep -E "desc|version|sha256" "Formula/canton@${VERSION_TAG}.rb" | head -5
+          else
+            echo "❌ Failed to create formula"
+            exit 1
+          fi
+          
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-and-formulas
+          path: |
+            canton-versions.json
+            Formula/canton@*.rb
+          retention-days: 7
+          
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "🧪 **Dry Run Mode** - No changes were committed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Live Mode** - Changes would be committed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- Versions processed: ${{ inputs.versions_to_process }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Dry run: ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Files Generated" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -la canton-versions.json Formula/canton@*.rb 2>/dev/null | tail -n +2 >> $GITHUB_STEP_SUMMARY || echo "No files generated" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

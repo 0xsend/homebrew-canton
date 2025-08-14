@@ -1,47 +1,257 @@
-name: Check and Release Canton Updates
+name: Update Canton Version Manifest
 
 on:
   schedule:
     # Run every 12 hours
     - cron: "0 */12 * * *"
   workflow_dispatch: # Allow manual triggering
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/update-canton.yml'
 
 jobs:
-  check-and-release:
+  update-manifest:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0 # Fetch full history including tags
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install GitHub CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gh
-
-      - name: Configure git for automated commits
+      - name: Configure git
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-      - name: Run Canton update script
-        run: bun run scripts/update-homebrew-formula.ts
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update canton-versions.json manifest
+        id: update-manifest
+        run: |
+          echo "📦 Updating Canton version manifest..."
+          
+          # Generate manifest with top 20 releases
+          bun run scripts/generate-version-manifest.ts 20
+          
+          # Check if manifest was modified
+          if git diff --quiet canton-versions.json; then
+            echo "✅ Manifest is already up to date"
+            echo "manifest_updated=false" >> $GITHUB_OUTPUT
+          else
+            echo "📝 Manifest was updated with new versions"
+            echo "manifest_updated=true" >> $GITHUB_OUTPUT
+            
+            # Show what changed
+            echo "Changes:"
+            git diff --stat canton-versions.json
+          fi
 
-      - name: Run update script (fallback)
-        if: failure()
-        run: ./update.sh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify SHA256 hashes
+        if: steps.update-manifest.outputs.manifest_updated == 'true'
+        run: |
+          echo "🔐 Verifying SHA256 hashes in manifest..."
+          
+          # Create a verification script
+          cat > verify-sha256.ts << 'EOF'
+          import { readFile } from "node:fs/promises";
+          import { createHash } from "node:crypto";
+          
+          const manifest = JSON.parse(await readFile("canton-versions.json", "utf-8"));
+          let errors = 0;
+          
+          // Verify top 3 releases
+          const versions = Object.entries(manifest.versions).slice(0, 3);
+          
+          for (const [tag, info] of versions) {
+            console.log(`Verifying ${tag}...`);
+            
+            try {
+              const response = await fetch(info.download_url);
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+              }
+              
+              const buffer = await response.arrayBuffer();
+              const hash = createHash("sha256");
+              hash.update(new Uint8Array(buffer));
+              const calculated = hash.digest("hex");
+              
+              if (calculated === info.sha256) {
+                console.log(`✅ ${tag}: SHA256 verified`);
+              } else {
+                console.error(`❌ ${tag}: SHA256 mismatch!`);
+                console.error(`  Expected: ${info.sha256}`);
+                console.error(`  Got:      ${calculated}`);
+                errors++;
+              }
+            } catch (error) {
+              console.error(`❌ ${tag}: Failed to verify - ${error.message}`);
+              errors++;
+            }
+          }
+          
+          if (errors > 0) {
+            process.exit(1);
+          }
+          EOF
+          
+          bun run verify-sha256.ts
+
+      - name: Update main formula SHA256
+        if: steps.update-manifest.outputs.manifest_updated == 'true'
+        run: |
+          echo "📝 Updating main formula with latest SHA256..."
+          
+          # Get the latest version info from manifest
+          LATEST_INFO=$(bun -e '
+            const manifest = require("./canton-versions.json");
+            const latest = Object.entries(manifest.versions)[0];
+            if (latest) {
+              console.log(JSON.stringify({
+                tag: latest[0],
+                sha256: latest[1].sha256
+              }));
+            }
+          ')
+          
+          if [ -n "$LATEST_INFO" ]; then
+            SHA256=$(echo "$LATEST_INFO" | jq -r '.sha256')
+            TAG=$(echo "$LATEST_INFO" | jq -r '.tag')
+            
+            echo "Updating Formula/canton.rb with SHA256 for $TAG"
+            
+            # Update the SHA256 in the main formula
+            sed -i "s/sha256 \"[a-f0-9]\{64\}\"/sha256 \"$SHA256\"/" Formula/canton.rb
+            
+            echo "✅ Updated canton.rb with SHA256: ${SHA256:0:12}..."
+          fi
+
+      - name: Create versioned formulas for new releases
+        if: steps.update-manifest.outputs.manifest_updated == 'true'
+        run: |
+          echo "🏗️ Creating versioned formulas for new releases..."
+          
+          # Create a script to generate formulas for new versions
+          cat > create-new-formulas.ts << 'EOF'
+          import { readFile, readdir } from "node:fs/promises";
+          import { spawn } from "node:child_process";
+          import { promisify } from "node:util";
+          
+          const exec = promisify(spawn);
+          
+          const manifest = JSON.parse(await readFile("canton-versions.json", "utf-8"));
+          const existingFormulas = await readdir("Formula");
+          
+          // Check top 5 versions
+          const versions = Object.entries(manifest.versions).slice(0, 5);
+          let created = 0;
+          
+          for (const [tag, info] of versions) {
+            const versionTag = tag.replace(/^v/, "");
+            const formulaName = `canton@${versionTag}.rb`;
+            
+            if (!existingFormulas.includes(formulaName)) {
+              console.log(`Creating formula for ${tag}...`);
+              
+              try {
+                const child = spawn("ruby", ["scripts/create-versioned-formula.rb", tag]);
+                
+                await new Promise((resolve, reject) => {
+                  child.on("close", (code) => {
+                    if (code === 0) resolve(code);
+                    else reject(new Error(`Process exited with code ${code}`));
+                  });
+                });
+                
+                console.log(`✅ Created ${formulaName}`);
+                created++;
+              } catch (error) {
+                console.error(`❌ Failed to create ${formulaName}: ${error.message}`);
+              }
+            }
+          }
+          
+          console.log(`Created ${created} new versioned formulas`);
+          EOF
+          
+          bun run create-new-formulas.ts
+
+      - name: Commit and push changes
+        if: steps.update-manifest.outputs.manifest_updated == 'true'
+        run: |
+          # Add all changes
+          git add canton-versions.json
+          git add Formula/canton.rb
+          git add Formula/canton@*.rb 2>/dev/null || true
+          
+          # Check if there are changes to commit
+          if ! git diff --cached --quiet; then
+            # Get summary of changes
+            NEW_VERSIONS=$(git diff --cached canton-versions.json | grep '^+.*"v3\.' | wc -l || echo "0")
+            
+            git commit -m "chore: update Canton version manifest and formulas
+
+- Updated canton-versions.json with $NEW_VERSIONS new versions
+- Verified SHA256 hashes for latest releases
+- Updated main formula SHA256
+- Generated versioned formulas for new releases
+
+🤖 Generated by GitHub Actions [skip ci]"
+            
+            git push
+            echo "✅ Changes pushed to repository"
+          else
+            echo "ℹ️ No changes to commit"
+          fi
+
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## Canton Version Manifest Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.update-manifest.outputs.manifest_updated }}" == "true" ]; then
+            echo "✅ **Manifest Updated**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Show latest versions
+            echo "### Latest Canton Versions" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            bun -e '
+              const manifest = require("./canton-versions.json");
+              const versions = Object.entries(manifest.versions).slice(0, 5);
+              versions.forEach(([tag, info]) => {
+                const type = info.is_prerelease ? "pre-release" : "stable";
+                console.log(`${tag} - ${info.canton_version} (${type})`);
+              });
+            ' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **No updates needed** - Manifest is already up to date" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Manifest Statistics" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          bun -e '
+            const manifest = require("./canton-versions.json");
+            const total = Object.keys(manifest.versions).length;
+            const prerelease = Object.values(manifest.versions).filter(v => v.is_prerelease).length;
+            const stable = total - prerelease;
+            console.log(`Total versions: ${total}`);
+            console.log(`Pre-releases: ${prerelease}`);
+            console.log(`Stable releases: ${stable}`);
+            console.log(`Last updated: ${manifest.updated_at}`);
+          ' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
