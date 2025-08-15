@@ -42,17 +42,11 @@ brew install ./Formula/canton@3.4.0-snapshot.20250813.1.rb
 To see available versions:
 
 ```bash
-# List all available Canton versions
-bun run scripts/canton-versions.ts all
+# Show latest versions from manifest
+bun run scripts/show-latest-versions.ts
 
-# Show current/latest version
-bun run scripts/canton-versions.ts current
-
-# List pre-release versions only
-bun run scripts/canton-versions.ts prerelease
-
-# List stable versions only
-bun run scripts/canton-versions.ts stable
+# Show manifest statistics
+bun run scripts/show-manifest-stats.ts
 ```
 
 ### Switch Between Versions
@@ -167,12 +161,6 @@ This repository automatically tracks Canton releases from Digital Asset:
 ### Manual Updates
 
 ```bash
-# Update the formula to the latest version
-bun run scripts/update-homebrew-formula.ts
-
-# Check for new versions
-bun run scripts/canton-versions.ts current
-
 # Generate version manifest
 bun run scripts/generate-version-manifest.ts
 ```
@@ -183,12 +171,11 @@ bun run scripts/generate-version-manifest.ts
 
 This repository includes several utility scripts:
 
-- `scripts/canton-versions.ts` - Fetch and manage Canton release versions
 - `scripts/create-versioned-formula.rb` - Create versioned formulas for specific DAML releases
 - `scripts/generate-version-manifest.ts` - Generate a manifest with SHA256 hashes
-- `scripts/update-homebrew-formula.ts` - Update the formula to the latest version
-- `scripts/install-canton-version.sh` - Wrapper script to install a specific version
-- `scripts/get-canton-release-info.rb` - Helper to fetch release info from GitHub API
+- `scripts/create-new-formulas.ts` - Create versioned formulas for new releases
+- `scripts/verify-sha256.ts` - Verify SHA256 hashes in manifest
+- `scripts/update-main-formula-sha256.ts` - Update main formula with latest SHA256
 
 ### Testing the Formula
 

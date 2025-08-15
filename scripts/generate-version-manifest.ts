@@ -7,7 +7,84 @@
  */
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { getAllCantonVersions, calculateSha256, type CantonRelease } from "./canton-versions";
+import { createHash } from "node:crypto";
+
+export interface CantonRelease {
+  cantonVersion: string;
+  damlTag: string;
+  downloadUrl: string;
+  sha256?: string;
+  isPrerelease: boolean;
+  publishedAt: string;
+  htmlUrl: string;
+}
+
+async function getAllCantonVersions(): Promise<CantonRelease[]> {
+  const response = await fetch("https://api.github.com/repos/digital-asset/daml/releases");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch releases: ${response.statusText}`);
+  }
+
+  interface GitHubRelease {
+    tag_name: string;
+    prerelease: boolean;
+    published_at: string;
+    html_url: string;
+    assets: Array<{
+      name: string;
+      browser_download_url: string;
+    }>;
+  }
+
+  const releases = (await response.json()) as GitHubRelease[];
+
+  return releases
+    .filter((release) =>
+      release.assets?.some(
+        (asset) =>
+          asset.name.includes("canton-open-source") &&
+          asset.name.endsWith(".tar.gz"),
+      ),
+    )
+    .map((release) => {
+      const cantonAsset = release.assets.find(
+        (asset) =>
+          asset.name.includes("canton-open-source") &&
+          asset.name.endsWith(".tar.gz"),
+      );
+
+      const cantonVersion = cantonAsset.name.replace(
+        /canton-open-source-(.+)\.tar\.gz/,
+        "$1",
+      );
+
+      return {
+        cantonVersion,
+        damlTag: release.tag_name,
+        downloadUrl: cantonAsset.browser_download_url,
+        isPrerelease: release.prerelease,
+        publishedAt: release.published_at,
+        htmlUrl: release.html_url,
+      } as CantonRelease;
+    })
+    .sort((a: CantonRelease, b: CantonRelease) => {
+      if (a.isPrerelease && !b.isPrerelease) return -1;
+      if (!a.isPrerelease && b.isPrerelease) return 1;
+      return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    });
+}
+
+async function calculateSha256(downloadUrl: string): Promise<string> {
+  const response = await fetch(downloadUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to download for SHA256 calculation: ${response.statusText}`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  const hash = createHash("sha256");
+  hash.update(new Uint8Array(buffer));
+  return hash.digest("hex");
+}
 
 const MANIFEST_PATH = path.join(process.cwd(), "canton-versions.json");
 
