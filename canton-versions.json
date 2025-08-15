@@ -1,5 +1,5 @@
 {
-  "updated_at": "2025-08-14T17:45:57.824Z",
+  "updated_at": "2025-08-15T18:39:18.467Z",
   "versions": {
     "v3.4.0-snapshot.20250813.1": {
       "canton_version": "3.4.0-snapshot.20250806.16573.0.vf9366406",
@@ -35,6 +35,111 @@
       "sha256": "8fd4026e3e80d8edffb1855dc20c1545bb718e6a20393c1f3b09b747578b7c29",
       "is_prerelease": true,
       "published_at": "2025-07-02T09:42:54Z"
+    },
+    "v3.4.0-snapshot.20250625.0": {
+      "canton_version": "3.4.0-snapshot.20250617.16217.0.vbdf62919",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250625.0/canton-open-source-3.4.0-snapshot.20250617.16217.0.vbdf62919.tar.gz",
+      "sha256": "5f1bf64d5d3bf50c4dd379bca44d46069e6ece43377177a6e09b4ff0979f640d",
+      "is_prerelease": true,
+      "published_at": "2025-06-25T11:10:30Z"
+    },
+    "v3.4.0-snapshot.20250618.0": {
+      "canton_version": "3.4.0-snapshot.20250616.16199.0.vfa59ad4b",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250618.0/canton-open-source-3.4.0-snapshot.20250616.16199.0.vfa59ad4b.tar.gz",
+      "sha256": "d63c21e8a1ab4fa3f565dd214a9b98e4e7d115abfd7f1d2955713c4e99c880a9",
+      "is_prerelease": true,
+      "published_at": "2025-06-18T06:49:06Z"
+    },
+    "v3.4.0-snapshot.20250611.0": {
+      "canton_version": "3.4.0-snapshot.20250520.15991.0.v507dc122",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250611.0/canton-open-source-3.4.0-snapshot.20250520.15991.0.v507dc122.tar.gz",
+      "sha256": "0a679d7659b385c17fb8475ed755de648e02b5754f2bbf2f86f9973d76a8d72c",
+      "is_prerelease": true,
+      "published_at": "2025-06-11T10:32:10Z"
+    },
+    "v3.4.0-snapshot.20250604.0": {
+      "canton_version": "3.4.0-snapshot.20250520.15991.0.v507dc122",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250604.0/canton-open-source-3.4.0-snapshot.20250520.15991.0.v507dc122.tar.gz",
+      "sha256": "0a679d7659b385c17fb8475ed755de648e02b5754f2bbf2f86f9973d76a8d72c",
+      "is_prerelease": true,
+      "published_at": "2025-06-05T15:34:21Z"
+    },
+    "v3.3.0-snapshot.20250603.0": {
+      "canton_version": "3.3.0-snapshot.20250530.15919.0.v3e7a341c",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.3.0-snapshot.20250603.0/canton-open-source-3.3.0-snapshot.20250530.15919.0.v3e7a341c.tar.gz",
+      "sha256": "7c88d6096701612dc628b6804c16d572c6c6a8cabe3f0ee32ab22afaa39c1eda",
+      "is_prerelease": true,
+      "published_at": "2025-06-03T20:24:42Z"
+    },
+    "v3.4.0-snapshot.20250514.0": {
+      "canton_version": "3.4.0-snapshot.20250506.15894.0.vd47e3ebf",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250514.0/canton-open-source-3.4.0-snapshot.20250506.15894.0.vd47e3ebf.tar.gz",
+      "sha256": "89d73ee0fc644441560765b46c8652bbc97fefb4ae6f4f33b586a7663333ea92",
+      "is_prerelease": true,
+      "published_at": "2025-05-14T10:21:52Z"
+    },
+    "v3.3.0-snapshot.20250507.0": {
+      "canton_version": "3.3.0-snapshot.20250507.15804.0.v15a8b550",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.3.0-snapshot.20250507.0/canton-open-source-3.3.0-snapshot.20250507.15804.0.v15a8b550.tar.gz",
+      "sha256": "88b646609816b457f9707ff9bf12b1fa0d35e01978212238116d707e749d31f8",
+      "is_prerelease": true,
+      "published_at": "2025-05-12T14:20:41Z"
+    },
+    "v3.4.0-snapshot.20250507.0": {
+      "canton_version": "3.4.0-snapshot.20250429.15866.0.vc8f10812",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250507.0/canton-open-source-3.4.0-snapshot.20250429.15866.0.vc8f10812.tar.gz",
+      "sha256": "80a3f585ead3b003991ffd0429054a412b3443c9a1a183816386716ff20f9b99",
+      "is_prerelease": true,
+      "published_at": "2025-05-07T14:29:25Z"
+    },
+    "v3.4.0-snapshot.20250430.0": {
+      "canton_version": "3.4.0-snapshot.20250422.15819.0.vb4694722",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250430.0/canton-open-source-3.4.0-snapshot.20250422.15819.0.vb4694722.tar.gz",
+      "sha256": "3d7bcd432b849cd804089e9159ecf597d2ba22d415eb12add0fe3ec10d7b5b7d",
+      "is_prerelease": true,
+      "published_at": "2025-04-30T13:46:46Z"
+    },
+    "v3.3.0-snapshot.20250417.0": {
+      "canton_version": "3.3.0-snapshot.20250416.15779.0.v6cccc0c4",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.3.0-snapshot.20250417.0/canton-open-source-3.3.0-snapshot.20250416.15779.0.v6cccc0c4.tar.gz",
+      "sha256": "7bead0601b16dc5d4f618bd7fd75ee5256bd42219baa1230b60c5e3b12384410",
+      "is_prerelease": true,
+      "published_at": "2025-04-17T11:53:24Z"
+    },
+    "v3.3.0-snapshot.20250416.0": {
+      "canton_version": "3.3.0-snapshot.20250412.15740.0.vd4a48308",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.3.0-snapshot.20250416.0/canton-open-source-3.3.0-snapshot.20250412.15740.0.vd4a48308.tar.gz",
+      "sha256": "978a8929dd18ea09f3662415c89aff779a295b8427838a601a71112567cc834e",
+      "is_prerelease": true,
+      "published_at": "2025-04-16T12:19:39Z"
+    },
+    "v3.3.0-snapshot.20250410.0": {
+      "canton_version": "3.3.0-snapshot.20250409.15708.0.v50d7c151",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.3.0-snapshot.20250410.0/canton-open-source-3.3.0-snapshot.20250409.15708.0.v50d7c151.tar.gz",
+      "sha256": "4419d3f5138dfeb4cc90a4a716b21cbab11d8df75fa3041b8a2c7ffef759e48a",
+      "is_prerelease": true,
+      "published_at": "2025-04-10T11:06:04Z"
+    },
+    "v3.3.0-snapshot.20250409.1": {
+      "canton_version": "3.3.0-snapshot.20250407.15675.0.v7edae7ab",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.3.0-snapshot.20250409.1/canton-open-source-3.3.0-snapshot.20250407.15675.0.v7edae7ab.tar.gz",
+      "sha256": "6f5d019831eea753a1e54cdcc424874a7e82b990a9643cbb23babdc3cc82e9cb",
+      "is_prerelease": true,
+      "published_at": "2025-04-09T12:58:47Z"
+    },
+    "v3.3.0-snapshot.20250402.0": {
+      "canton_version": "3.3.0-snapshot.20250401.15649.0.v76ec6d6b",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.3.0-snapshot.20250402.0/canton-open-source-3.3.0-snapshot.20250401.15649.0.v76ec6d6b.tar.gz",
+      "sha256": "4ca86f53b47aec81eb910a754cacbdf8f51605f0126f2cbe7ee2daa2a80e0252",
+      "is_prerelease": true,
+      "published_at": "2025-04-02T10:30:47Z"
+    },
+    "v3.3.0-snapshot.20250319.0": {
+      "canton_version": "3.3.0-snapshot.20250314.15478.0.ve9d27a7b",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.3.0-snapshot.20250319.0/canton-open-source-3.3.0-snapshot.20250314.15478.0.ve9d27a7b.tar.gz",
+      "sha256": "25ed7c1d3b1a6d2f73d051febe90a51f5971d7d27cbaace8098b37c177a0091d",
+      "is_prerelease": true,
+      "published_at": "2025-03-20T13:59:08Z"
     }
   }
 }
