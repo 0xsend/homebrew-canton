@@ -74,131 +74,20 @@ jobs:
         if: steps.update-manifest.outputs.manifest_updated == 'true'
         run: |
           echo "🔐 Verifying SHA256 hashes in manifest..."
-          
-          # Create a verification script
-          cat > verify-sha256.ts << 'VERIFY_SCRIPT_END'
-          import { readFile } from "node:fs/promises";
-          import { createHash } from "node:crypto";
-          
-          const manifest = JSON.parse(await readFile("canton-versions.json", "utf-8"));
-          let errors = 0;
-          
-          // Verify top 3 releases
-          const versions = Object.entries(manifest.versions).slice(0, 3);
-          
-          for (const [tag, info] of versions) {
-            console.log(`Verifying ${tag}...`);
-            
-            try {
-              const response = await fetch(info.download_url);
-              if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-              }
-              
-              const buffer = await response.arrayBuffer();
-              const hash = createHash("sha256");
-              hash.update(new Uint8Array(buffer));
-              const calculated = hash.digest("hex");
-              
-              if (calculated === info.sha256) {
-                console.log(`✅ ${tag}: SHA256 verified`);
-              } else {
-                console.error(`❌ ${tag}: SHA256 mismatch!`);
-                console.error(`  Expected: ${info.sha256}`);
-                console.error(`  Got:      ${calculated}`);
-                errors++;
-              }
-            } catch (error) {
-              console.error(`❌ ${tag}: Failed to verify - ${error.message}`);
-              errors++;
-            }
-          }
-          
-          if (errors > 0) {
-            process.exit(1);
-          }
-VERIFY_SCRIPT_END
-          
-          bun run verify-sha256.ts
+          bun run scripts/verify-sha256.ts 3
 
       - name: Update main formula SHA256
         if: steps.update-manifest.outputs.manifest_updated == 'true'
+        id: update-formula
         run: |
           echo "📝 Updating main formula with latest SHA256..."
-          
-          # Get the latest version info from manifest
-          LATEST_INFO=$(bun -e '
-            const manifest = require("./canton-versions.json");
-            const latest = Object.entries(manifest.versions)[0];
-            if (latest) {
-              console.log(JSON.stringify({
-                tag: latest[0],
-                sha256: latest[1].sha256
-              }));
-            }
-          ')
-          
-          if [ -n "$LATEST_INFO" ]; then
-            SHA256=$(echo "$LATEST_INFO" | jq -r '.sha256')
-            TAG=$(echo "$LATEST_INFO" | jq -r '.tag')
-            
-            echo "Updating Formula/canton.rb with SHA256 for $TAG"
-            
-            # Update the SHA256 in the main formula
-            sed -i "s/sha256 \"[a-f0-9]\{64\}\"/sha256 \"$SHA256\"/" Formula/canton.rb
-            
-            echo "✅ Updated canton.rb with SHA256: ${SHA256:0:12}..."
-          fi
+          bun run scripts/update-main-formula-sha256.ts
 
       - name: Create versioned formulas for new releases
         if: steps.update-manifest.outputs.manifest_updated == 'true'
         run: |
           echo "🏗️ Creating versioned formulas for new releases..."
-          
-          # Create a script to generate formulas for new versions
-          cat > create-new-formulas.ts << 'CREATE_FORMULAS_END'
-          import { readFile, readdir } from "node:fs/promises";
-          import { spawn } from "node:child_process";
-          import { promisify } from "node:util";
-          
-          const exec = promisify(spawn);
-          
-          const manifest = JSON.parse(await readFile("canton-versions.json", "utf-8"));
-          const existingFormulas = await readdir("Formula");
-          
-          // Check top 5 versions
-          const versions = Object.entries(manifest.versions).slice(0, 5);
-          let created = 0;
-          
-          for (const [tag, info] of versions) {
-            const versionTag = tag.replace(/^v/, "");
-            const formulaName = `canton@${versionTag}.rb`;
-            
-            if (!existingFormulas.includes(formulaName)) {
-              console.log(`Creating formula for ${tag}...`);
-              
-              try {
-                const child = spawn("ruby", ["scripts/create-versioned-formula.rb", tag]);
-                
-                await new Promise((resolve, reject) => {
-                  child.on("close", (code) => {
-                    if (code === 0) resolve(code);
-                    else reject(new Error(`Process exited with code ${code}`));
-                  });
-                });
-                
-                console.log(`✅ Created ${formulaName}`);
-                created++;
-              } catch (error) {
-                console.error(`❌ Failed to create ${formulaName}: ${error.message}`);
-              }
-            }
-          }
-          
-          console.log(`Created ${created} new versioned formulas`);
-CREATE_FORMULAS_END
-          
-          bun run create-new-formulas.ts
+          bun run scripts/create-new-formulas.ts 5
 
       - name: Commit and push changes
         if: steps.update-manifest.outputs.manifest_updated == 'true'
@@ -213,19 +102,16 @@ CREATE_FORMULAS_END
             # Get summary of changes
             NEW_VERSIONS=$(git diff --cached canton-versions.json | grep '^+.*"v3\.' | wc -l || echo "0")
             
-            # Create commit with message using heredoc
-            cat > commit-message.txt << COMMIT_EOF
-chore: update Canton version manifest and formulas
+            # Create commit message
+            git commit -m "chore: update Canton version manifest and formulas
 
 - Updated canton-versions.json with $NEW_VERSIONS new versions
 - Verified SHA256 hashes for latest releases  
 - Updated main formula SHA256
 - Generated versioned formulas for new releases
 
-🤖 Generated by GitHub Actions [skip ci]
-COMMIT_EOF
+🤖 Generated by GitHub Actions [skip ci]"
             
-            git commit -F commit-message.txt
             git push
             echo "✅ Changes pushed to repository"
           else
@@ -243,7 +129,7 @@ COMMIT_EOF
           EXISTING_TAGS=$(git tag -l "canton-*" | tr '\n' ' ')
           echo "Existing tags: $EXISTING_TAGS"
           
-          # Create tags for new versions
+          # Process versions from manifest
           bun -e '
             const manifest = require("./canton-versions.json");
             const { execSync } = require("child_process");
@@ -260,7 +146,7 @@ COMMIT_EOF
                 execSync(`git rev-parse --verify refs/tags/${tagName}`, { stdio: "ignore" });
                 console.log(`Tag ${tagName} already exists`);
               } catch {
-                // Tag doesn't exist, create it
+                // Tag does not exist, create it
                 console.log(`Creating tag: ${tagName}`);
                 
                 try {
@@ -277,8 +163,12 @@ COMMIT_EOF
             
             // Create GitHub releases for new tags
             for (const { tag, damlTag, info } of createdTags) {
+              const releaseTitle = `Canton ${info.canton_version} (DAML ${damlTag})`;
+              const isPrerelease = info.is_prerelease ? "--prerelease" : "";
+              
+              // Create release notes file
               const releaseNotes = `Homebrew formula for Canton version ${info.canton_version} from DAML release ${damlTag}.
-            
+
 This release tracks the Canton release from Digital Asset:
 - DAML Release: ${damlTag}
 - Canton Version: ${info.canton_version}
@@ -301,13 +191,11 @@ Original DAML release: https://github.com/digital-asset/daml/releases/tag/${daml
 
 🤖 Auto-generated by GitHub Actions`;
               
-              const releaseCmd = `gh release create "${tag}" \
-                --title "Canton ${info.canton_version} (DAML ${damlTag})" \
-                --notes "${releaseNotes.replace(/"/g, "\\\"").replace(/\n/g, "\\n")}" \
-                ${info.is_prerelease ? "--prerelease" : ""}`;
+              // Write release notes to file
+              require("fs").writeFileSync("release-notes.md", releaseNotes);
               
               try {
-                execSync(releaseCmd, { stdio: "inherit" });
+                execSync(`gh release create "${tag}" --title "${releaseTitle}" --notes-file release-notes.md ${isPrerelease}`, { stdio: "inherit" });
                 console.log(`✅ Created GitHub release for ${tag}`);
               } catch (error) {
                 console.error(`❌ Failed to create release for ${tag}: ${error.message}`);
