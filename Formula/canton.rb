@@ -55,8 +55,8 @@ class Canton < Formula
     ohai "Using fallback version"
     {
       daml_tag: "v3.4.0-snapshot.20250813.1",
-      canton_version: "3.4.0-snapshot.20250813.16485.0.vaa088e38",
-      download_url: "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250813.1/canton-open-source-3.4.0-snapshot.20250813.16485.0.vaa088e38.tar.gz",
+      canton_version: "3.4.0-snapshot.20250806.16573.0.vf9366406",
+      download_url: "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250813.1/canton-open-source-3.4.0-snapshot.20250806.16573.0.vf9366406.tar.gz",
       is_prerelease: true
     }
   end
@@ -91,7 +91,10 @@ class Canton < Formula
     
     <<~EOS
       Canton #{release_info[:canton_version]} (#{release_type}) has been installed.
-      DAML Release: #{release_info[:daml_tag]}
+      DAML Release Tag: #{release_info[:daml_tag]}
+      
+      Note: The DAML Libraries version shown by 'canton --version' reflects the
+      embedded DAML SDK version, which may differ from the release tag.
       
       Canton requires Java 11 or later. You may need to set JAVA_HOME:
         export JAVA_HOME=$(/usr/libexec/java_home -v 11)
