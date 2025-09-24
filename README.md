@@ -5,8 +5,8 @@ A Homebrew formula for installing Canton, the blockchain protocol implementation
 ## Features
 
 - 🚀 **Latest Pre-release by Default**: Automatically installs the latest pre-release from DAML
-- 📦 **Version Selection**: Install any specific Canton release using versioned formulas
-- 🔄 **Multiple Versions**: Support for installing and switching between multiple Canton versions
+- 📦 **Version Selection**: Install any specific Canton release using the CANTON_VERSION environment variable
+- 🔄 **JSON Manifest**: All versions and SHA256 hashes tracked in canton-versions.json
 - ☕ **Java Integration**: Works with system Java 11+ or Homebrew OpenJDK
 - 📦 **Complete Installation**: Includes binaries, configs, docs, and examples
 - 🤖 **Automated Updates**: GitHub Actions tracks and updates Canton releases
@@ -27,40 +27,49 @@ brew install canton
 
 ### Install Specific Version
 
-You can install a specific DAML release version using versioned formulas:
+You can install a specific Canton version using the `CANTON_VERSION` environment variable:
 
 ```bash
-# Example: Install specific DAML release v3.4.0-snapshot.20250813.1
-brew tap 0xsend/homebrew-canton
-brew install canton@3.4.0-snapshot.20250813.1
+# Install a specific version (with 'v' prefix)
+CANTON_VERSION=v3.4.0-snapshot.20250813.1 brew install canton
 
-# Or create a versioned formula first
-ruby scripts/create-versioned-formula.rb 3.4.0-snapshot.20250813.1
-brew install ./Formula/canton@3.4.0-snapshot.20250813.1.rb
+# Or without the 'v' prefix (it's automatically normalized)
+CANTON_VERSION=3.4.0-snapshot.20250813.1 brew install canton
+
+# For local development/testing
+export HOMEBREW_NO_INSTALL_FROM_API=1
+CANTON_VERSION=v3.4.0-snapshot.20250709.0 brew install --build-from-source canton
 ```
 
 To see available versions:
 
 ```bash
-# Show latest versions from manifest
-bun run scripts/show-latest-versions.ts
+# List all available versions from manifest
+jq -r '.versions | keys[]' canton-versions.json | sort
 
-# Show manifest statistics
-bun run scripts/show-manifest-stats.ts
+# Show version details for a specific release
+jq '.versions["v3.4.0-snapshot.20250813.1"]' canton-versions.json
+
+# Count available versions
+jq '.versions | length' canton-versions.json
 ```
 
 ### Switch Between Versions
 
-If you have multiple Canton versions installed:
+To install a different version when one is already installed:
 
 ```bash
-# Unlink current version
-brew unlink canton
-
-# Link a specific version
-brew link canton@3.4.0-snapshot.20250813.1
-
 # Check current version
+canton --version
+cat /opt/homebrew/opt/canton/VERSION_INFO.txt
+
+# Uninstall current version
+brew uninstall canton
+
+# Install a different version
+CANTON_VERSION=v3.4.0-snapshot.20250709.0 brew install canton
+
+# Verify new version
 canton --version
 ```
 
@@ -131,23 +140,16 @@ bun run scripts/generate-version-manifest.ts 10
 # This creates canton-versions.json with cached version information
 ```
 
-### Creating Versioned Formulas
+### Formula Architecture
 
-To create a formula for a specific DAML release:
+The formula uses a three-tier approach for version management:
 
-```bash
-# Generate formula for a specific DAML tag
-ruby scripts/create-versioned-formula.rb v3.4.0-snapshot.20250813.1
+1. **Environment Variable**: Check for `CANTON_VERSION` to install specific versions
+2. **GitHub API**: Attempt to fetch latest release from GitHub
+3. **JSON Manifest**: Fall back to canton-versions.json for version info and SHA256 hashes
+4. **Hardcoded Fallback**: Last resort if all other methods fail
 
-# The script will:
-# 1. Fetch release information from GitHub
-# 2. Find the Canton asset in the release
-# 3. Calculate or retrieve SHA256 hash from manifest
-# 4. Generate Formula/canton@3.4.0-snapshot.20250813.1.rb
-
-# Install the generated formula
-brew install ./Formula/canton@3.4.0-snapshot.20250813.1.rb
-```
+This ensures reliable installation while allowing version flexibility.
 
 ## Automated Canton Tracking
 
@@ -171,11 +173,11 @@ bun run scripts/generate-version-manifest.ts
 
 This repository includes several utility scripts:
 
-- `scripts/create-versioned-formula.rb` - Create versioned formulas for specific DAML releases
-- `scripts/generate-version-manifest.ts` - Generate a manifest with SHA256 hashes
-- `scripts/create-new-formulas.ts` - Create versioned formulas for new releases
+- `scripts/generate-version-manifest.ts` - Generate/update the manifest with SHA256 hashes
 - `scripts/verify-sha256.ts` - Verify SHA256 hashes in manifest
-- `scripts/update-main-formula-sha256.ts` - Update main formula with latest SHA256
+- `scripts/update-main-formula-sha256.ts` - Update main formula's hardcoded fallback values
+- `scripts/show-latest-versions.ts` - Display latest versions from manifest
+- `scripts/show-manifest-stats.ts` - Show statistics about the version manifest
 
 ### Testing the Formula
 
@@ -183,18 +185,22 @@ This repository includes several utility scripts:
 # Test the formula syntax
 brew audit --formula canton
 
-# Test installation locally
-brew install --build-from-source ./Formula/canton.rb
+# Test installation of latest version
+export HOMEBREW_NO_INSTALL_FROM_API=1
+brew install --build-from-source canton
 
-# Test with verbose output
-brew install --build-from-source --verbose ./Formula/canton.rb
+# Test installation of specific version
+CANTON_VERSION=v3.4.0-snapshot.20250813.1 brew install --build-from-source canton
+
+# Test with verbose output for debugging
+brew install --build-from-source --verbose canton
 ```
 
 ### Formula Structure
 
-- `Formula/canton.rb` - Main formula that dynamically installs the latest pre-release
-- `Formula/canton@<version>.rb` - Version-specific formulas (generated on demand)
-- `canton-versions.json` - Manifest file with cached version information and SHA256 hashes
+- `Formula/canton.rb` - Single formula that supports both latest and specific versions via environment variable
+- `canton-versions.json` - Manifest file with all available versions and their SHA256 hashes
+- No versioned formulas needed - all versions handled by the main formula
 
 ## Troubleshooting
 

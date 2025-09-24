@@ -18,6 +18,26 @@ class Canton < Formula
     nil
   end
 
+  # Get a specific version from the manifest
+  def self.version_from_manifest(version_tag)
+    manifest = load_manifest
+    return nil unless manifest && manifest["versions"]
+
+    # Normalize the version tag (ensure it starts with 'v')
+    normalized_tag = version_tag.start_with?("v") ? version_tag : "v#{version_tag}"
+
+    info = manifest["versions"][normalized_tag]
+    return nil unless info
+
+    {
+      daml_tag: normalized_tag,
+      canton_version: info["canton_version"],
+      download_url: info["download_url"],
+      sha256: info["sha256"],
+      is_prerelease: info["is_prerelease"]
+    }
+  end
+
   # Get the latest version from the manifest
   def self.latest_from_manifest
     manifest = load_manifest
@@ -41,6 +61,23 @@ class Canton < Formula
       sha256: info["sha256"],
       is_prerelease: info["is_prerelease"]
     }
+  end
+
+  # Dynamically fetch the specified or latest version
+  def self.fetch_version
+    # Check for user-specified version first
+    if ENV["CANTON_VERSION"]
+      version_info = version_from_manifest(ENV["CANTON_VERSION"])
+      if version_info
+        ohai "Installing specific Canton version: #{version_info[:daml_tag]}"
+        return version_info
+      else
+        opoo "Canton version #{ENV["CANTON_VERSION"]} not found in manifest, falling back to latest"
+      end
+    end
+
+    # Otherwise fetch the latest version
+    fetch_latest_prerelease
   end
 
   # Dynamically fetch the latest pre-release
@@ -114,8 +151,8 @@ class Canton < Formula
     end
   end
 
-  # Fetch latest release info at formula load time
-  latest = fetch_latest_prerelease
+  # Fetch specified or latest release info at formula load time
+  latest = fetch_version
 
   url latest[:download_url]
   sha256 latest[:sha256]
@@ -129,16 +166,17 @@ class Canton < Formula
     prefix.install Dir["*"]
     
     # Create a version info file for reference
+    version_info = self.class.fetch_version
     (prefix/"VERSION_INFO.txt").write <<~EOS
-      Canton Version: #{self.class.fetch_latest_prerelease[:canton_version]}
+      Canton Version: #{version_info[:canton_version]}
       DAML Tag: #{version}
-      Pre-release: #{self.class.fetch_latest_prerelease[:is_prerelease] ? "Yes" : "No"}
+      Pre-release: #{version_info[:is_prerelease] ? "Yes" : "No"}
       Installed: #{Time.now}
     EOS
   end
 
   def caveats
-    release_info = self.class.fetch_latest_prerelease
+    release_info = self.class.fetch_version
     release_type = release_info[:is_prerelease] ? "pre-release" : "stable"
 
     <<~EOS
