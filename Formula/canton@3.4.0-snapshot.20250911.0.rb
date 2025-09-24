@@ -1,12 +1,12 @@
 require "json"
 
-class Canton < Formula
-  desc "Blockchain protocol implementation from Digital Asset (latest pre-release)"
+class CantonAT340Snapshot202509110 < Formula
+  desc "Blockchain protocol implementation from Digital Asset (version 3.4.0-snapshot.20250911.0)"
   homepage "https://www.canton.network/"
 
-  url "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250918.0/canton-open-source-3.4.0-snapshot.20250916.16914.0.vab38472a.tar.gz"
-  sha256 "e073d9f05040c963e392ff2e19445ca3daa95e3faa57877bd4e08ea6ad74001f"
-  version "3.4.0-snapshot.20250918.0"
+  url "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20250911.0/canton-open-source-3.4.0-snapshot.20250909.16871.0.vac429485.tar.gz"
+  sha256 "9c33da63abc059c5ab9817ba47294eabd65262b2a7ccd9fa9e6ebf30fa38c061"
+  version "3.4.0-snapshot.20250911.0"
   license "Apache-2.0"
 
   # Java 11+ is required (recommend 17 for best compatibility)
@@ -17,8 +17,8 @@ class Canton < Formula
 
     # Create a version info file for reference
     (prefix/"VERSION_INFO.txt").write <<~EOS
-      Canton Version: 3.4.0-snapshot.20250916.16914.0.vab38472a
-      DAML Tag: v3.4.0-snapshot.20250918.0
+      Canton Version: 3.4.0-snapshot.20250909.16871.0.vac429485
+      DAML Tag: v3.4.0-snapshot.20250911.0
       Pre-release: Yes
       Installed: #{Time.now}
     EOS
@@ -26,8 +26,8 @@ class Canton < Formula
 
   def caveats
     <<~EOS
-      Canton 3.4.0-snapshot.20250916.16914.0.vab38472a (pre-release) has been installed.
-      DAML Release Tag: v3.4.0-snapshot.20250918.0
+      Canton 3.4.0-snapshot.20250909.16871.0.vac429485 (pre-release) has been installed.
+      DAML Release Tag: v3.4.0-snapshot.20250911.0
 
       Canton requires Java 11 or later. You may need to set JAVA_HOME:
         export JAVA_HOME=$(/usr/libexec/java_home -v 11)
