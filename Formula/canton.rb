@@ -9,8 +9,9 @@ class Canton < Formula
   version "3.4.0-snapshot.20250918.0"
   license "Apache-2.0"
 
-  # Java 11+ is required (recommend 17 for best compatibility)
-  depends_on "openjdk@17" => :recommended
+  # Java 11+ is required - we mark as optional to avoid dependency resolution issues
+  # Users should ensure Java is installed separately
+  depends_on "openjdk@17" => :optional
 
   def install
     prefix.install Dir["*"]
@@ -29,11 +30,19 @@ class Canton < Formula
       Canton 3.4.0-snapshot.20250916.16914.0.vab38472a (pre-release) has been installed.
       DAML Release Tag: v3.4.0-snapshot.20250918.0
 
-      Canton requires Java 11 or later. You may need to set JAVA_HOME:
-        export JAVA_HOME=$(/usr/libexec/java_home -v 11)
+      ⚠️  IMPORTANT: Canton requires Java 11 or later to run.
 
-      Or if using Homebrew's OpenJDK:
-        export JAVA_HOME="#{Formula["openjdk@17"].opt_prefix}/libexec/openjdk.jdk/Contents/Home"
+      Check if Java is installed:
+        java -version
+
+      If not installed, install via Homebrew:
+        brew install openjdk@17
+
+      Then set JAVA_HOME:
+        export JAVA_HOME="$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
+
+      Or use system Java (if available):
+        export JAVA_HOME=$(/usr/libexec/java_home -v 11)
 
       Configuration files are available at:
         #{prefix}/config/

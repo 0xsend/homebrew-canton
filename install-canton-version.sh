@@ -36,7 +36,8 @@ fi
 
 # Install the formula
 echo "🚀 Installing canton@$FORMULA_VERSION..."
-export HOMEBREW_NO_INSTALL_FROM_API=1
+# Note: We don't use HOMEBREW_NO_INSTALL_FROM_API here to allow
+# Homebrew to fetch dependencies from the API
 brew install "canton@$FORMULA_VERSION"
 
 echo ""

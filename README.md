@@ -13,6 +13,18 @@ A Homebrew formula for installing Canton, the blockchain protocol implementation
 
 ## Installation
 
+### Prerequisites
+
+Canton requires Java 11 or later. Install Java first:
+
+```bash
+# Option 1: Install via Homebrew (recommended)
+brew install openjdk@17
+
+# Option 2: Use system Java (must be 11+)
+java -version
+```
+
 ### Install Latest Pre-release (Default)
 
 The formula automatically fetches and installs the latest pre-release version from DAML:
@@ -23,6 +35,9 @@ brew tap 0xsend/homebrew-canton
 
 # Install latest Canton pre-release
 brew install canton
+
+# Or install with Java dependency
+brew install canton --with-openjdk@17
 ```
 
 ### Install Specific Version
@@ -33,9 +48,11 @@ Install specific Canton versions using versioned formulas:
 # Install a specific version
 brew install canton@3.4.0-snapshot.20250813.1
 
-# For local development/testing
-export HOMEBREW_NO_INSTALL_FROM_API=1
-brew install --build-from-source canton@3.4.0-snapshot.20250709.0
+# Or with Java dependency included
+brew install canton@3.4.0-snapshot.20250813.1 --with-openjdk@17
+
+# Using the helper script (automatically generates formula if needed)
+./install-canton-version.sh v3.4.0-snapshot.20250813.1
 ```
 
 To see available versions:
@@ -212,6 +229,20 @@ brew install --build-from-source --verbose canton
 - `canton-versions.json` - Manifest file with all available versions and their SHA256 hashes
 
 ## Troubleshooting
+
+### Dependency Resolution Issues
+
+If you encounter errors about missing dependencies like `gobject-introspection`:
+
+```bash
+# This happens when using HOMEBREW_NO_INSTALL_FROM_API with openjdk dependencies
+# Solution: Don't use HOMEBREW_NO_INSTALL_FROM_API, or install without Java:
+brew install canton@version
+
+# Then ensure Java is installed separately:
+brew install openjdk@17
+# Or use system Java
+```
 
 ### Java Issues
 
