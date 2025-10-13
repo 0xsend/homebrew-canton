@@ -1,7 +1,7 @@
 require "json"
 
-class Canton < Formula
-  desc "Blockchain protocol implementation from Digital Asset (latest pre-release)"
+class CantonAT340Snapshot202510130 < Formula
+  desc "Blockchain protocol implementation from Digital Asset (version 3.4.0-snapshot.20251013.0)"
   homepage "https://www.canton.network/"
 
   url "https://github.com/digital-asset/daml/releases/download/v3.4.0-snapshot.20251013.0/canton-open-source-3.4.0-snapshot.20251010.17148.0.vcb5fe692.tar.gz"
