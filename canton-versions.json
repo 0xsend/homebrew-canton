@@ -1,5 +1,5 @@
 {
-  "updated_at": "2025-11-06T12:05:44.714Z",
+  "updated_at": "2025-11-13T00:13:33.401Z",
   "versions": {
     "v3.4.0-snapshot.20250813.1": {
       "canton_version": "3.4.0-snapshot.20250806.16573.0.vf9366406",
@@ -224,6 +224,13 @@
       "sha256": "47a95d3babb380fa131e381dd2330ab25a9e61d32f1221ed1c045ceff08a071e",
       "is_prerelease": true,
       "published_at": "2025-11-06T09:10:33Z"
+    },
+    "v3.4.7": {
+      "canton_version": "3.4.7",
+      "download_url": "https://github.com/digital-asset/daml/releases/download/v3.4.7/canton-open-source-3.4.7.tar.gz",
+      "sha256": "520a582a3d390c8abf02c421e9bb5063e95c2fdc3c775f08e295986d8919b533",
+      "is_prerelease": true,
+      "published_at": "2025-11-12T16:47:20Z"
     }
   }
 }
